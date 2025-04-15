@@ -31,10 +31,10 @@ logging.set_verbosity(logging.WARNING)
 FLAGS = flags.FLAGS
 
 flags.DEFINE_multi_string(
-    "checkpoint_weights_path", None, "Path to checkpoint", required=True
+    "checkpoint_weights_path", '/home/r2d2/bridge_ws/bridge_data_v2/gcbc_128_ckpt/checkpoint_145000/checkpoint', "Path to checkpoint", required=True
 )
 flags.DEFINE_multi_string(
-    "checkpoint_config_path", None, "Path to checkpoint config JSON", required=True
+    "checkpoint_config_path", '/home/r2d2/bridge_ws/bridge_data_v2/gcbc_128_ckpt/gcbc_128_config.json', "Path to checkpoint config JSON", required=True
 )
 flags.DEFINE_integer("im_size", None, "Image size", required=True)
 flags.DEFINE_string("video_save_path", None, "Path to save video")

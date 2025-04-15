@@ -36,16 +36,16 @@ logging.set_verbosity(logging.WARNING)
 FLAGS = flags.FLAGS
 
 flags.DEFINE_multi_string(
-    "checkpoint_weights_path", None, "Path to checkpoint", required=True
+    "checkpoint_weights_path", '/home/r2d2/bridge_ws/bridge_data_v2/dgcbc_128/checkpoint_2000000', "Path to checkpoint", required=False
 )
 flags.DEFINE_multi_string(
-    "checkpoint_config_path", None, "Path to checkpoint config JSON", required=True
+    "checkpoint_config_path", '/home/r2d2/bridge_ws/bridge_data_v2/dgcbc_128/dgcbc_128_config.json', "Path to checkpoint config JSON", required=False
 )
-flags.DEFINE_string("goal_type", None, "Goal type", required=True)
-flags.DEFINE_integer("im_size", None, "Image size", required=True)
-flags.DEFINE_string("video_save_path", None, "Path to save video")
+flags.DEFINE_string("goal_type", "gc", "Goal type", required=False)
+flags.DEFINE_integer("im_size", 128, "Image size", required=False)
+flags.DEFINE_string("video_save_path", '/home/r2d2/bridge_ws/bridge_data_v2/videos', "Path to save video")
 flags.DEFINE_string(
-    "goal_image_path", None, "Path to a single goal image"
+    "goal_image_path", '/home/r2d2/bridge_ws/bridge_data_v2/video_images/115.jpg', "Path to a single goal image"
 )  # not used by lc
 flags.DEFINE_integer("num_timesteps", 120, "num timesteps")
 flags.DEFINE_bool("blocking", False, "Use the blocking controller")
@@ -55,7 +55,7 @@ flags.DEFINE_spaceseplist(
 flags.DEFINE_spaceseplist("initial_eep", [0.3, 0.0, 0.15], "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
-flags.DEFINE_string("ip", "localhost", "IP address of the robot")
+flags.DEFINE_string("ip", "172.16.0.11", "IP address of the robot")
 flags.DEFINE_integer("port", 5556, "Port of the robot")
 
 # show image flag
@@ -68,7 +68,7 @@ NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
 WORKSPACE_BOUNDS = [[0.1, -0.15, -0.01, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]]
-CAMERA_TOPICS = [{"name": "/blue/image_raw"}]
+CAMERA_TOPICS = [{"name": "/C920/image_raw"}]
 FIXED_STD = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ENV_PARAMS = {
     "camera_topics": CAMERA_TOPICS,
@@ -233,7 +233,8 @@ def main(_):
     if FLAGS.goal_type == "gc":
         image_goal = None
         if FLAGS.goal_image_path is not None:
-            image_goal = np.array(Image.open(FLAGS.goal_image_path))
+            image_goal = np.array(Image.open(FLAGS.goal_image_path).resize((128,128)))
+            Image._show(Image.open(FLAGS.goal_image_path).resize((128,128)))
     elif FLAGS.goal_type == "lc":
         instruction = None
 
@@ -389,3 +390,6 @@ def main(_):
 
 if __name__ == "__main__":
     app.run(main)
+
+# d-gcbc succeeded in 1 out of about 14 trials when goal was picking up the carrot task with no-sub goals which are
+# given in eval_dgcbc.py.
