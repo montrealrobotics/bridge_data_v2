@@ -14,16 +14,16 @@ import numpy as np
 import tensorflow as tf
 
 import cv2
-import jax
+# import jax
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 from PIL import Image
 import imageio
 
-from flax.training import checkpoints
-from jaxrl_m.vision import encoders
-from jaxrl_m.agents import agents
-from jaxrl_m.data.text_processing import text_processors
+# from flax.training import checkpoints
+# from jaxrl_m.vision import encoders
+# from jaxrl_m.agents import agents
+# from jaxrl_m.data.text_processing import text_processors
 
 # bridge_data_robot imports
 from widowx_envs.widowx_env_service import WidowXClient, WidowXStatus, WidowXConfigs
@@ -80,74 +80,48 @@ ENV_PARAMS = {
 
 ##############################################################################
 
+from mini_grp2 import *
 
 def load_checkpoint(checkpoint_weights_path, checkpoint_config_path):
-    with open(checkpoint_config_path, "r") as f:
-        config = json.load(f)
+    import torch
+    from einops import rearrange
 
-    # create encoder from wandb config
-    encoder_def = encoders[config["encoder"]](**config["encoder_kwargs"])
+    model = torch.load("./miniGRP.pth")
 
-    act_pred_horizon = config["dataset_kwargs"].get("act_pred_horizon")
-    obs_horizon = config["dataset_kwargs"].get("obs_horizon")
-
-    # Set action
-    if act_pred_horizon is not None:
-        example_actions = np.zeros((1, act_pred_horizon, 7), dtype=np.float32)
-    else:
-        example_actions = np.zeros((1, 7), dtype=np.float32)
-
-    # Set observations
-    if obs_horizon is None:
-        img_obs_shape = (1, FLAGS.im_size, FLAGS.im_size, 3)
-    else:
-        img_obs_shape = (1, obs_horizon, FLAGS.im_size, FLAGS.im_size, 3)
-    example_obs = {"image": np.zeros(img_obs_shape, dtype=np.uint8)}
-
-    # Set goals
-    if FLAGS.goal_type == "gc":
-        example_goals = {
-            "image": np.zeros((1, FLAGS.im_size, FLAGS.im_size, 3), dtype=np.uint8)
-        }
-    elif FLAGS.goal_type == "lc":
-        example_goals = {"language": np.zeros((1, 512), dtype=np.float32)}
-    else:
-        raise ValueError(f"Unknown goal type: {FLAGS.goal_type}")
-
-    # create agent from wandb config
-    rng = jax.random.PRNGKey(0)
-    rng, construct_rng = jax.random.split(rng)
-    agent = agents[config["agent"]].create(
-        rng=construct_rng,
-        observations=example_obs,
-        goals=example_goals,
-        actions=example_actions,
-        encoder_def=encoder_def,
-        **config["agent_kwargs"],
-    )
-
-    # load action metadata from wandb
-    action_proprio_metadata = config["bridgedata_config"]["action_proprio_metadata"]
-    action_mean = np.array(action_proprio_metadata["action"]["mean"])
-    action_std = np.array(action_proprio_metadata["action"]["std"])
-
-    # hydrate agent with parameters from checkpoint
-    agent = checkpoints.restore_checkpoint(checkpoint_weights_path, agent)
-
-    def get_action(obs, goal_obs):
-        nonlocal rng
-        rng, key = jax.random.split(rng)
-        action = jax.device_get(
-            agent.sample_actions(obs, goal_obs, seed=key, argmax=FLAGS.deterministic)
-        )
-        action = action * action_std + action_mean
+    def get_action(obs, image_goal, text_goal=""):
+        obs = [obs_["image"] for obs_ in obs] # obs is a list of dicts
+        obs = np.stack(obs, axis=-1)  # stack along the last dimension
+        obs = rearrange(obs, 'h w c t -> h w (c t)')  # add batch dimension
+        device = "cpu"
+        text_goal = np.zeros((1, 1, 512), dtype=np.float32)
+        _encode_state = lambda af:   ((af/(255.0)*2.0)-1.0) # encoder: take a float, output an integer
+        _resize_state = lambda sf:   cv2.resize(np.array(sf, dtype=np.float32), (64, 64))  # resize state
+        action, loss = model.forward(torch.tensor(np.array([_encode_state(_resize_state(obs))])).to(device)
+                        ,torch.tensor(text_goal, dtype=torch.float).to(device) ## There can be issues here if th text is shorter than any example in the dataset
+                        # ,torch.tensor(txt_goal, dtype=torch.long).to(device) ## There can be issues here if th text is shorter than any example in the dataset
+                        ,torch.tensor(np.array([_encode_state(_resize_state(image_goal["image"]))])).to(device) ## Not the correct goal image... Should mask this.
+                        )
+        action = action.cpu().detach().numpy()[0][:7] ## Add in the gripper close action
+        _decode_action = lambda binN: (binN * action_std) + action_mean  # Undo mapping to [-1, 1]
+        action_mean = np.array([0.02461858280003071,
+      0.022891279309988022,
+      -0.045159097760915756,
+      0.0011062328703701496,
+      0.0019464065553620458,
+      0.001989248674362898,
+      -0.02906678058207035])
+        action_std = np.array([0.2755078673362732,
+      0.352868914604187,
+      0.3764951825141907,
+      0.07468929141759872,
+      0.08207540959119797,
+      0.14809995889663696,
+      1.3713711500167847])
+        action = _decode_action(action)
         return action
 
+    obs_horizon = 3
     text_processor = None
-    if FLAGS.goal_type == "lc":
-        text_processor = text_processors[config["text_processor"]](
-            **config["text_processor_kwargs"]
-        )
 
     return get_action, obs_horizon, text_processor
 
@@ -328,12 +302,12 @@ def main(_):
                             obs_hist.extend([obs] * obs_horizon)
                         else:
                             obs_hist.append(obs)
-                        obs = stack_obs(obs_hist)
+                        obs = obs_hist
                     # print(f"t={t}, obs={obs.shape}")
                     last_tstep = time.time()
                     actions = get_action(obs, goal_obs)
 
-                    actions = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0]) 
+                    # actions = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0]) 
                     if len(actions.shape) == 1:
                         actions = actions[None]
                     for i in range(FLAGS.act_exec_horizon):

@@ -1,4 +1,4 @@
-import jax
+# import jax
 import numpy as np
 from pyquaternion import Quaternion
 
