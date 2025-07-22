@@ -306,7 +306,7 @@ def main(_):
         try:
             while t < FLAGS.num_timesteps:
                 if time.time() > last_tstep + STEP_DURATION or FLAGS.blocking:
-                    obs = widowx_client.get_observation()
+                    obs = widowx_client.get_observation() ## array of shape (1, 49152)
                     if obs is None:
                         print("WARNING retrying to get observation...")
                         continue
@@ -329,10 +329,11 @@ def main(_):
                         else:
                             obs_hist.append(obs)
                         obs = stack_obs(obs_hist)
-
+                    # print(f"t={t}, obs={obs.shape}")
                     last_tstep = time.time()
                     actions = get_action(obs, goal_obs)
 
+                    actions = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0]) 
                     if len(actions.shape) == 1:
                         actions = actions[None]
                     for i in range(FLAGS.act_exec_horizon):
