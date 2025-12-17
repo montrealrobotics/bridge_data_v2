@@ -1,17 +1,39 @@
-FROM robonet-base:latest
+FROM dustynv/jax:0.5.2-r36.4.0-cu128-24.04
 
-COPY requirements.txt /tmp/requirements.txt
-RUN ~/myenv/bin/pip install -r /tmp/requirements.txt
-RUN ~/myenv/bin/pip install --upgrade "jax[cuda11_pip]==0.4.13" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-ENV PYTHONPATH=${PYTHONPATH}:/home/robonet/code/bridge_data_v2
+SHELL ["/bin/bash", "-c"]
 
-# modify packages to work with python 3.8 (ros noetic needs python 3.8)
-# to avoid orbax checkpoint error, downgrade flax 
-RUN ~/myenv/bin/pip install flax==0.6.11
-# to avoid typing errors, upgrade distrax
-RUN ~/myenv/bin/pip install distrax==0.1.3
+RUN mkdir -p /root/workspace/src
 
-# avoid git safe directory errors
-RUN git config --global --add safe.directory /home/robonet/code/bridge_data_v2
+ENV WORKSPACE=/root/workspace/src
 
-WORKDIR /home/robonet/code/bridge_data_v2
+RUN apt-get update && apt-get install --no-install-recommends -y \
+	git \
+	vim \
+	python3-opencv \
+	xauth \
+	x11-apps \
+	cmake \
+	&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR $WORKSPACE
+
+RUN git clone https://github.com/youliangtan/edgeml
+RUN unset PIP_INDEX_URL && cd edgeml && pip install -e .
+
+WORKDIR $WORKSPACE
+#RUN git clone -b v2.5.0 https://github.com/pytorch/pytorch
+#RUN cd pytorch && git submodule sync && git submodule update --init --recursive
+
+#COPY ./bridge_data_v2/build_torch_orin.sh /root/workspace/src/pytorch
+#WORKDIR $WORKSPACE/pytorch
+#RUN export CMAKE_POLICY_VERSION_MINIMUM=3.5 && bash ./build_torch_orin.sh
+COPY torch-2.5.0-cp312-cp312-linux_aarch64.whl $WORKSPACE
+WORKDIR $WORKSPACE
+RUN unset PIP_INDEX_URL && pip install torch-2.5.0-cp312-cp312-linux_aarch64.whl
+COPY ./bridge_data_v2 $WORKSPACE/bridge_data_v2
+COPY ./bridge_data_robot $WORKSPACE/bridge_data_robot
+COPY ./checkpoints $WORKSPACE/checkpoints
+COPY ./requirements.txt $WORKSPACE
+COPY ./cusparse_install.sh $WORKSPACE
+RUN bash ./cusparse_install.sh
+RUN unset PIP_INDEX_URL && pip install -r $WORKSPACE/requirements.txt

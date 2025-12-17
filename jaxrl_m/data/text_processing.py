@@ -1,8 +1,7 @@
 from typing import Optional
-
+from sentence_transformers import SentenceTransformer
 import jax.numpy as jnp
 import numpy as np
-import tensorflow as tf
 from flax.core import FrozenDict
 
 MULTI_MODULE = "https://tfhub.dev/google/universal-sentence-encoder-multilingual/3"
@@ -47,15 +46,22 @@ class HFTokenizer(TextProcessor):
 
 
 class MuseEmbedding(TextProcessor):
-    def __init__(self):
-        import tensorflow_hub as hub  # lazy import
-        import tensorflow_text  # required for muse
-
-        self.muse_model = hub.load(MULTI_MODULE)
+    def __init__(self, model_name="distiluse-base-multilingual-cased-v2"):
+        """
+        Produces 512-dimensional multilingual embeddings.
+        """
+        self.model = SentenceTransformer(model_name)
 
     def encode(self, strings):
-        with tf.device("/cpu:0"):
-            return self.muse_model(strings).numpy()
+        if isinstance(strings, str):
+            strings = [strings]
+
+        embeddings = self.model.encode(
+            strings,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )
+        return embeddings
 
 
 class CLIPTextProcessor(TextProcessor):
