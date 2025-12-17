@@ -1,0 +1,27 @@
+services:
+  bridge_v2:
+    image: bridge_v2_image
+    container_name: bridge_v2
+    build:
+      context: .
+    #entrypoint: ["/bin/bash", "-c", "/home/robonet/widowx_envs/scripts/run.sh"]
+    environment:
+      - DISPLAY=:0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CHECKPOINT_DIR=/root/workspace/src/checkpoints
+      - PYTHONPATH=/root/workspace/src/bridge_data_robot/widowx_envs:/root/workspace/src/bridge_data_v2:/usr/lib/python3/dist-packages
+        #user: robonet:46
+    stdin_open: true
+    tty: true
+    device_cgroup_rules:
+      - 'c *:* rmw'
+    network_mode: host
+    runtime: nvidia
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      # if you want to be able to edit widowx_envs code without rebuilding the image, this
+      # /media/harddrive/:/home/robonet/trainingdata  # TODO (YL): better way to mount a local directory
+      # - ./widowx_envs:/home/robonet/widowx_envs
+      - /dev:/dev  # for host tty access
+
