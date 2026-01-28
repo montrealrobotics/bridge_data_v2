@@ -36,8 +36,6 @@ logging.set_verbosity(logging.WARNING)
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_multi_string("checkpoint_weights_path", None, "Path to checkpoint", required=True)
-flags.DEFINE_multi_string("checkpoint_config_path", None, "Path to checkpoint config JSON", required=True)
 flags.DEFINE_multi_string("policy", None, "Path to policy file", required=True)
 flags.DEFINE_string("goal_type", "gc", "Goal type", required=False)
 flags.DEFINE_integer("im_size", 128, "Image size", required=False)
@@ -80,7 +78,7 @@ def load_yaml_config(cfg_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def load_checkpoint(checkpoint_weights_path, checkpoint_config_path, cfg_path):
+def load_checkpoint(cfg_path):
 
     config = load_yaml_config(cfg_path)
 
@@ -166,19 +164,10 @@ def request_goal_image(image_goal, widowx_client):
 
 
 def main(_):
-    assert len(FLAGS.checkpoint_weights_path) == len(FLAGS.checkpoint_config_path)
 
     policies = {}
-    for checkpoint_weights_path, checkpoint_config_path in zip(
-        FLAGS.checkpoint_weights_path, FLAGS.checkpoint_config_path
-    ):
-        assert Path(checkpoint_weights_path).exists(), checkpoint_weights_path
 
-        checkpoint_num = int(str(checkpoint_weights_path).split("_")[-1])
-        run_name = str(checkpoint_config_path).split("/")[-1]
-        policies[f"{run_name}-{checkpoint_num}"] = load_checkpoint(
-            checkpoint_weights_path, checkpoint_config_path, FLAGS.training_config
-        )
+    policies["mini_grp"] = load_checkpoint(FLAGS.training_config)
 
     initial_eep = [float(e) for e in FLAGS.initial_eep]
     start_state = np.concatenate([initial_eep, [0, 0, 0, 1]])
