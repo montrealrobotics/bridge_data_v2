@@ -1,0 +1,3 @@
+[submodule "bridge_data_robot"]
+	path = bridge_data_robot
+	url = git@github.com:montrealrobotics/bridge_data_robot.git

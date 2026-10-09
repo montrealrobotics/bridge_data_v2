@@ -19,6 +19,92 @@ The official implementations and papers for all the methods can be found here:
 
 Please open a GitHub issue if you encounter problems with this code. 
 
+## Our setup: WidowX on `block` (lab notes)
+
+Notes for picking the robot work back up. Last updated 2026-10-03.
+
+### Layout
+
+- **Robot computer `block`** (Ubuntu 22.04) drives the WidowX 250s (`/dev/ttyDXL`) and a Logitech Brio 501 camera (`/dev/video0`). The robot stack runs in Docker (ROS 2 Humble) from `~/playground/bridge_data_robot`, which is the [montrealrobotics fork](https://github.com/montrealrobotics/bridge_data_robot) at commit `5554eb7` plus local fixes (see below). `block` reaches the internet over the Mila-Public Wi-Fi. **Do not pull new code on `block`.** The fork's newer commits are work in progress.
+- **Laptop** runs the policy and sends actions to `block` over the server-client interface (edgeml, ports 5556/5557).
+- **Link:** a direct ethernet cable with no DHCP, so both ends use fixed addresses:
+  - `block` (`enp1s0`): `10.30.100.107/24`
+  - laptop (NetworkManager "Wired connection 2"): `10.30.100.1/24`, with `ipv4.never-default yes` so Wi-Fi keeps the default route
+
+```bash
+ssh gberseth@10.30.100.107        # key auth
+# fallback if IPv4 on the link is broken (link-local IPv6):
+ssh gberseth@fe80::50f2:2091:e0e4:bdb1%enxa0cec8fb63e0
+# laptop side lost its address?
+nmcli connection up "Wired connection 2"
+```
+
+### Laptop Python environment
+
+This uses a uv venv at `.venv` (Python 3.10, CPU-only JAX; the laptop has an AMD GPU). The robot client code comes from `bridge_data_robot/` in this folder, a clone of the fork checked out on branch `robot-block` at `5554eb7` so it matches the server. The older copy in `~/playground/bridge_data_robot` on the laptop is not used.
+
+`requirements.txt` no longer installs as written. `constraints.txt` holds the pins and the full rebuild recipe. The main fixes are:
+- `jaxlib==0.4.13` has been removed from PyPI, so install it from the JAX index with `--find-links https://storage.googleapis.com/jax-releases/jax_releases.html`.
+- Pin `orbax-checkpoint==0.2.7`, `ml-dtypes==0.2.0` and `scipy<1.13`; newer versions break JAX 0.4.13.
+- `jaxrl_m/` has no `__init__.py`, so install this repo with `--config-settings editable_mode=compat`.
+
+```bash
+uv venv --python 3.10 .venv
+uv pip install --python .venv -r requirements.txt -c constraints.txt \
+  --find-links https://storage.googleapis.com/jax-releases/jax_releases.html
+uv pip install --python .venv --config-settings editable_mode=compat -e . -e bridge_data_robot/widowx_envs
+uv pip install --python .venv git+https://github.com/youliangtan/edgeml.git
+```
+
+**Checkpoint:** a GCBC policy (ResNet-34 encoder, 128x128 images) is in `checkpoints/` (`checkpoint_145000/` and `gcbc_128_config.json`). It loads and predicts actions offline in about 10 ms per step on the CPU.
+
+### Running
+
+On `block`:
+```bash
+cd ~/playground/bridge_data_robot
+# first start, or after changing code that is baked into the image:
+USB_CONNECTOR_CHART=$(pwd)/usb_connector_chart.yml docker compose up --build robonet
+# otherwise restart the existing container (keeps the docker-cp'd fixes, see below):
+docker restart robonet_gberseth
+# wait for "Started streamer 0 ... → topic blue", then:
+docker compose exec robonet bash -lic "widowx_env_service --server"
+```
+
+On the laptop:
+```bash
+source .venv/bin/activate
+# smoke test: the arm runs a short scripted sequence and a camera window opens
+python bridge_data_robot/widowx_envs/widowx_envs/widowx_env_service.py --client --ip 10.30.100.107
+# policy
+cd experiments
+python eval.py \
+  --checkpoint_weights_path ../checkpoints/checkpoint_145000 \
+  --checkpoint_config_path ../checkpoints/gcbc_128_config.json \
+  --im_size 128 --goal_type gc --ip 10.30.100.107 --show_image --blocking
+```
+
+### Local fixes on `block` (uncommitted)
+
+The robot code was partly ported from ROS 1 to ROS 2. These fixes were needed to get the server through `init`:
+
+| File | Change | Why |
+|---|---|---|
+| `widowx_envs/widowx_envs/widowx_env_service.py` | `tf.transformations` → `tf_transformations` | `tf` is ROS 1 only; server crashed on `init` |
+| `multicam_server/launch/streamer.launch.py` | declare args before nodes; remap `image_raw`/`camera_info` to `<camera_name>/…`; open `video_stream_provider` | crashed with `use_sim_time does not exist`; published on `/camera/*`; server timed out on `/blue/camera_info` |
+| `usb_connector_chart.yml` | Brio (`usb-0000:04:00.4-1`) mapped to `blue` | key `Brio 501` gave an invalid topic; clients request `/blue/image_raw` |
+| `widowx_envs/scripts/run.sh`, `docker-compose.yml` (pre-existing) | `realsense:=false`; `runtime: nvidia` commented out | no RealSense or NVIDIA GPU on `block` |
+
+`.bak` copies of the originals sit next to the launch file and the chart. The first two fixes are mirrored in this folder's `bridge_data_robot/` clone. They were `docker cp`'d into the running container `robonet_gberseth` and are **not yet built into the image**. A recreated container loses them until you rebuild with `--build`.
+
+### Status and open issues
+
+- **Done:** network, SSH, laptop env, checkpoint loading, and the arm initializing on `block`. The patched camera stream was verified on its own (`/blue/image_raw` at 10 Hz plus `/blue/camera_info`).
+- **Next:** restart the container, run the client smoke test, then run `eval.py` with the GCBC checkpoint.
+- `widowx_rs.launch.py` ignores its `realsense` argument and always starts the RealSense node. That causes the harmless "No RealSense devices were found!" warning; fix it with an `IfCondition`.
+- `image_publisher` publishes at its default 10 Hz and ignores `fps`. Pass `publish_rate` if a faster rate is needed.
+- Rebuild the image so the fixes survive container recreation, and consider committing them to the fork.
+
 ## Data 
 The raw dataset (comprised of JPEGs, PNGs, and pkl files) can be downloaded [here](https://rail.eecs.berkeley.edu/datasets/bridge_release/data/). `demos*.zip` file contains the demonstration data, and `scripted*.zip` contains the data collected with a scripted policy. For training, the raw data needs to be converted into a format that is compatible with a data loader. We offer two options:
 

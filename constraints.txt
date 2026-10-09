@@ -1,0 +1,13 @@
+# Pins needed to install requirements.txt with uv on Python 3.10 (CPU jax). Usage:
+#   uv venv --python 3.10 .venv
+#   uv pip install --python .venv -r requirements.txt -c constraints.txt \
+#     --find-links https://storage.googleapis.com/jax-releases/jax_releases.html
+#   uv pip install --python .venv --config-settings editable_mode=compat -e . -e bridge_data_robot/widowx_envs
+#   uv pip install --python .venv git+https://github.com/youliangtan/edgeml.git
+tensorflow_text==2.13.0
+tensorflow_hub<0.16
+numpy==1.24.3
+jaxlib==0.4.13
+orbax-checkpoint==0.2.7
+ml-dtypes==0.2.0
+scipy<1.13
