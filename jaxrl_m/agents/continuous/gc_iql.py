@@ -43,7 +43,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
             goal_indices = jnp.where(
                 neg_goal_mask, neg_goal_indices, jnp.arange(batch_size)
             )
-            new_goals = jax.tree_map(lambda x: x[goal_indices], batch["goals"])
+            new_goals = jax.tree_util.tree_map(lambda x: x[goal_indices], batch["goals"])
             new_rewards = jnp.where(neg_goal_mask, -1, batch["rewards"])
             return new_goals, new_rewards
 

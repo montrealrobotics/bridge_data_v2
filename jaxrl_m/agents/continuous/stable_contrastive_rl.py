@@ -385,10 +385,10 @@ class StableContrastiveRLAgent(flax.struct.PyTreeNode):
 
         rng, init_rng = jax.random.split(rng)
         if len(observations["image"].shape) == 3:
-            observations = jax.tree_map(
+            observations = jax.tree_util.tree_map(
                 lambda x: jnp.expand_dims(x, axis=0), observations
             )
-            goals = jax.tree_map(lambda x: jnp.expand_dims(x, axis=0), goals)
+            goals = jax.tree_util.tree_map(lambda x: jnp.expand_dims(x, axis=0), goals)
             actions = actions[None]
         params = model_def.init(
             init_rng,

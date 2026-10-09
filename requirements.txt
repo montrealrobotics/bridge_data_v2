@@ -1,25 +1,26 @@
-gym >= 0.26
-numpy==1.24.3
-jax==0.4.13
-distrax==0.1.2
-flax==0.7.0
-ml_collections >= 0.1.0
-tqdm >= 4.60.0
-chex==0.1.6
-optax==0.1.5
-absl-py >= 0.12.0
-scipy >= 1.6.0
-wandb >= 0.12.14
-tensorflow==2.13.0
-tensorflow_probability==0.21
-tensorflow_hub
-tensorflow_text
-einops >= 0.6.1
-imageio >= 2.31.1
-moviepy >= 1.0.3
-orbax
-matplotlib
-pyquaternion
-opencv-python
-opencv-contrib-python
-funcsigs
+gym==0.26.2
+numpy==1.26.4
+jax[cuda12]==0.6.2
+distrax==0.1.5
+flax==0.11.2
+ml_collections==1.1.0
+tqdm==4.70.1
+chex==0.1.90
+optax==0.2.8
+absl-py==2.5.0
+scipy==1.17.1
+wandb==0.30.0
+tensorflow==2.21.0
+tensorflow_probability==0.25.0
+tf-keras==2.21.0
+tensorflow_hub==0.16.1
+tensorflow_text==2.21.1
+einops==0.8.2
+imageio==2.38.0
+moviepy==2.2.1
+orbax-checkpoint==0.12.7
+matplotlib==3.6.3
+pyquaternion==0.9.9
+opencv-python==4.11.0.86
+opencv-contrib-python==4.11.0.86
+funcsigs==1.0.2

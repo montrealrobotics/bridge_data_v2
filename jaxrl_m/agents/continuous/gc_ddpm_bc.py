@@ -139,8 +139,8 @@ class GCDDPMBCAgent(flax.struct.PyTreeNode):
         if len(observations["image"].shape) == 4:
             # unbatched input from evaluation
             batch_size = 1
-            observations = jax.tree_map(lambda x: x[None], observations)
-            goals = jax.tree_map(lambda x: x[None], goals)
+            observations = jax.tree_util.tree_map(lambda x: x[None], observations)
+            goals = jax.tree_util.tree_map(lambda x: x[None], goals)
         else:
             batch_size = observations["image"].shape[0]
 

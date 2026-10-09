@@ -152,7 +152,7 @@ def main(_):
         agent = checkpoints.restore_checkpoint(FLAGS.config.resume_path, target=agent)
     # replicate agent across devices
     # need the jnp.array to avoid a bug where device_put doesn't recognize primitives
-    agent = jax.device_put(jax.tree_map(jnp.array, agent), sharding.replicate())
+    agent = jax.device_put(jax.tree_util.tree_map(jnp.array, agent), sharding.replicate())
 
     timer = Timer()
     for i in tqdm.tqdm(range(int(FLAGS.config.num_steps))):
@@ -174,7 +174,7 @@ def main(_):
             for _, batch in zip(range(FLAGS.config.num_val_batches), val_data_iter):
                 rng, val_rng = jax.random.split(rng)
                 metrics.append(agent.get_debug_metrics(batch, seed=val_rng))
-            metrics = jax.tree_map(lambda *xs: np.mean(xs), *metrics)
+            metrics = jax.tree_util.tree_map(lambda *xs: np.mean(xs), *metrics)
             wandb_logger.log({"validation": metrics}, step=i)
             timer.tock("val")
 

@@ -24,7 +24,7 @@ from jaxrl_m.agents import agents
 from jaxrl_m.data.text_processing import text_processors
 
 # bridge_data_robot imports
-from widowx_envs.widowx_env_service import WidowXClient, WidowXStatus, WidowXConfigs
+from widowx_envs.widowx_env_service import WidowXClient, WidowXStatus, WidowXConfigs, DEFAULT_CAMERA_TOPICS, parse_camera_topics
 from utils import state_to_eep, stack_obs
 
 ##############################################################################
@@ -60,6 +60,10 @@ flags.DEFINE_integer("port", 5556, "Port of the robot")
 
 # show image flag
 flags.DEFINE_bool("show_image", False, "Show image")
+flags.DEFINE_string(
+    "camera_topics", None,
+    "Comma separated image topics (default: $WIDOWX_CAMERA_TOPICS or /blue/image_raw)",
+)
 
 ##############################################################################
 
@@ -68,7 +72,7 @@ NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
 WORKSPACE_BOUNDS = [[0.1, -0.15, -0.01, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]]
-CAMERA_TOPICS = [{"name": "/blue/image_raw"}]
+CAMERA_TOPICS = DEFAULT_CAMERA_TOPICS
 FIXED_STD = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ENV_PARAMS = {
     "camera_topics": CAMERA_TOPICS,
@@ -225,6 +229,8 @@ def main(_):
     # set up environment
     env_params = WidowXConfigs.DefaultEnvParams.copy()
     env_params.update(ENV_PARAMS)
+    if FLAGS.camera_topics:
+        env_params["camera_topics"] = parse_camera_topics(FLAGS.camera_topics)
     env_params["state_state"] = list(start_state)
     widowx_client = WidowXClient(host=FLAGS.ip, port=FLAGS.port)
     widowx_client.init(env_params, image_size=FLAGS.im_size)

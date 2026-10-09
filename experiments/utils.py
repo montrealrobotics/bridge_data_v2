@@ -4,7 +4,7 @@ from pyquaternion import Quaternion
 
 def stack_obs(obs):
     dict_list = {k: [dic[k] for dic in obs] for k in obs[0]}
-    return jax.tree_map(
+    return jax.tree_util.tree_map(
         lambda x: np.stack(x), dict_list, is_leaf=lambda x: type(x) == list
     )
 
