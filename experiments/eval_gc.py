@@ -22,6 +22,7 @@ from jaxrl_m.agents import agents
 # bridge_data_robot imports
 from widowx_envs.widowx_env import BridgeDataRailRLPrivateWidowX
 from multicam_server.topic_utils import IMTopic
+from widowx_envs.utils.camera_config import select_camera_topics
 from utils import stack_obs
 
 np.set_printoptions(suppress=True)
@@ -45,6 +46,10 @@ flags.DEFINE_spaceseplist("goal_eep", [0.3, 0.0, 0.15], "Goal position")
 flags.DEFINE_spaceseplist("initial_eep", [0.3, 0.0, 0.15], "Initial position")
 flags.DEFINE_integer("act_exec_horizon", 1, "Action sequence length")
 flags.DEFINE_bool("deterministic", True, "Whether to sample action deterministically")
+flags.DEFINE_string(
+    "camera_topics", None,
+    "Comma separated image topics (default: $WIDOWX_CAMERA_TOPICS, else cameras.yaml, else /blue/image_raw)",
+)
 
 ##############################################################################
 
@@ -53,7 +58,6 @@ NO_PITCH_ROLL = False
 NO_YAW = False
 STICKY_GRIPPER_NUM_STEPS = 1
 WORKSPACE_BOUNDS = np.array([[0.1, -0.15, -0.1, -1.57, 0], [0.45, 0.25, 0.25, 1.57, 0]])
-CAMERA_TOPICS = [IMTopic("/blue/image_raw")]
 FIXED_STD = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 ##############################################################################
@@ -157,7 +161,7 @@ def main(_):
         "catch_environment_except": False,
         "start_state": start_state,
         "return_full_image": False,
-        "camera_topics": CAMERA_TOPICS,
+        "camera_topics": [IMTopic(t) for t in select_camera_topics(FLAGS.camera_topics)],
     }
     env = BridgeDataRailRLPrivateWidowX(env_params, fixed_image_size=FLAGS.im_size)
 
