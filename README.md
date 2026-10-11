@@ -40,32 +40,35 @@ Training hyperparameters can be modified in `experiments/configs/data_config.py`
 
 ## Evaluation
 
-First, set up the robot hardware according to our [guide](https://docs.google.com/document/d/1si-6cTElTWTgflwcZRPfgHU7-UwfCUkEztkH3ge5CGc/edit?usp=sharing). Install our WidowX robot controller stack from [this repo](https://github.com/rail-berkeley/bridge_data_robot).
+Policies run on an inference machine and control the robot over the network: the robot control computer runs
+the robot server from [montrealrobotics/bridge_data_robot](https://github.com/montrealrobotics/bridge_data_robot)
+(branch `jazzy`, see its README), and `experiments/eval.py` here connects to it as a client. The inference
+machine does not need ROS; it can also be the robot control computer itself (use the default `--ip localhost`).
 
-There are two ways to interface a policy with the robot controller: the docker compose service method or the server-client method. Refer to the [bridge_data_robot](https://github.com/rail-berkeley/bridge_data_robot) docs for an explanation of how to set up each method. In general, we recommend the server-client method.
-
-For the server-client method, start the server on the robot. Then run the following commands on the client. You can specify the IP of the remote server via the `--ip` flag. The default IP is `localhost` (i.e the server and client are the same machine). 
+Set up the inference machine as described in [Environment](#environment), start the server on the
+robot, then run on the inference machine (`--ip` is the robot control computer's address):
 
 ```bash
 # Specify the path to the downloaded checkpoints directory
 export CHECKPOINT_DIR=/path/to/checkpoint_dir
 
 # For GCBC
-python experiments/eval.py \
+python experiments/eval.py --ip <ROBOT_IP> \
   --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_300000 \
   --checkpoint_config_path $CHECKPOINT_DIR/gcbc_256_config.json \
   --im_size 256 --goal_type gc --show_image --blocking
 
 # For LCBC
-python experiments/eval.py \
+python experiments/eval.py --ip <ROBOT_IP> \
   --checkpoint_weights_path $CHECKPOINT_DIR/checkpoint_145000 \
   --checkpoint_config_path $CHECKPOINT_DIR/lcbc_256_config.json \
   --im_size 256 --goal_type lc --show_image --blocking
 ```
 
-You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use the flag `--goal_eep` to specify the position of the end effector when taking a goal image.
-
-To evaluate image-conditioned or language-conditioned methods with the docker compose service method, run `eval_gc.py` or `eval_lc.py` respectively in the `bridge_data_v2` docker container.
+You can also specify an initial position for the end effector with the flag `--initial_eep`. Similarly, use
+the flag `--goal_eep` to specify the position of the end effector when taking a goal image. Cameras: by
+default the client uses the cameras selected on the robot side (`cameras.yaml`) or `$WIDOWX_CAMERA_TOPICS`;
+`--camera_topics` overrides both.
 
 ## Provided Checkpoints
 
@@ -75,24 +78,61 @@ We don't currently have a checkpoints for ACT or RT-1 available but may release 
 
 ## Environment
 
-The dependencies for this codebase can be installed in a conda environment:
+This sets up an inference / training machine: Python 3.12, jax with CUDA 12 (including RTX 50-series GPUs),
+TensorFlow, and the `widowx_envs` client used to talk to the robot.
+
+### Option 1: Docker
 
 ```bash
-conda create -n jaxrl python=3.10
-conda activate jaxrl
-pip install -e . 
-pip install -r requirements.txt
-```
-For GPU:
-```bash
-pip install --upgrade "jax[cuda11_pip]==0.4.13" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+git clone -b ubuntu_24 https://github.com/montrealrobotics/bridge_data_v2.git
+cd bridge_data_v2
+docker build -t robonet-bridge-data-v2 .
+
+# run (mount your checkpoints; --network host to reach the robot; DISPLAY/X11 for --show_image)
+docker run --rm -it --gpus all --network host \
+  -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -v /path/to/checkpoints:/checkpoints:ro \
+  robonet-bridge-data-v2 bash
 ```
 
-For TPU
+To work on the code without rebuilding, mount your checkout with `-v $PWD:/home/robonet/code/bridge_data_v2`.
+
+### Option 2: Python environment (uv)
+
+```bash
+git clone -b ubuntu_24 https://github.com/montrealrobotics/bridge_data_v2.git
 ```
-pip install --upgrade "jax[tpu]==0.4.13" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+
+Then create the environment with **uv**:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --python 3.12 ~/bridge_env
+source ~/bridge_env/bin/activate
+uv pip install -r bridge_data_v2/requirements.txt
 ```
-See the [Jax Github page](https://github.com/google/jax) for more details on installing Jax. 
+
+The policy code (`jaxrl_m`) is imported from the repo itself rather than installed (`pip install -e .` does
+not pick it up), so put the repo on `PYTHONPATH` in every shell you run it from:
+
+```bash
+export PYTHONPATH=$PWD/bridge_data_v2:$PYTHONPATH
+```
+
+`requirements.txt` also installs the robot client (`widowx_envs`, from
+[bridge_data_robot](https://github.com/montrealrobotics/bridge_data_robot) branch `jazzy`) and `edgeml`. The
+client must match the robot's version, so if the robot runs a different branch, change the `widowx_envs`
+line accordingly. To edit the client code itself, install a local checkout over it:
+`uv pip install -e /path/to/bridge_data_robot/widowx_envs`.
+
+The install downloads a few GB (TensorFlow, jax and CUDA libraries); with uv it takes about a minute on a
+fast connection.
+
+### Check the setup
+
+```bash
+python -c "import jax, jaxrl_m.agents; print(jax.devices())"    # should list a CudaDevice
+```
 
 ## Cite
 

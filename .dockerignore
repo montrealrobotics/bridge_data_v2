@@ -1,0 +1,6 @@
+.git
+checkpoints
+bridge_data_robot
+**/__pycache__
+**/*.pyc
+*.zip

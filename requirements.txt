@@ -19,8 +19,11 @@ einops==0.8.2
 imageio==2.38.0
 moviepy==2.2.1
 orbax-checkpoint==0.12.7
-matplotlib==3.6.3
+matplotlib==3.9.4
 pyquaternion==0.9.9
 opencv-python==4.11.0.86
 opencv-contrib-python==4.11.0.86
 funcsigs==1.0.2
+widowx_envs @ git+https://github.com/montrealrobotics/bridge_data_robot.git@jazzy#subdirectory=widowx_envs
+edgeml @ git+https://github.com/youliangtan/edgeml
+pyyaml

@@ -1,0 +1,24 @@
+services:
+  eval:
+    image: robonet-bridge-data-v2:inference
+    build: .
+    network_mode: host
+    stdin_open: true
+    tty: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROBOT_IP=${ROBOT_IP:-localhost}
+      # camera topics on the robot, used by the robot client when --camera_topics is not given
+      - WIDOWX_CAMERA_TOPICS=${WIDOWX_CAMERA_TOPICS:-/D435/camera/D435/color/image_raw}
+    volumes:
+      - .:/home/robonet/code/bridge_data_v2
+      - ${CHECKPOINTS:-./checkpoints/extracted}:/checkpoints:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: bash
